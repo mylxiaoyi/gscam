@@ -129,9 +129,13 @@ namespace gscam {
     sink_ = gst_element_factory_make("appsink",NULL);
     GstCaps * caps = NULL;
     if (image_encoding_ == sensor_msgs::image_encodings::RGB8) {
-        caps = gst_caps_new_simple("video/x-raw-rgb", NULL); 
+        caps = gst_caps_new_simple("video/x-raw",
+                "format", G_TYPE_STRING, "RGB",
+                NULL); 
     } else if (image_encoding_ == sensor_msgs::image_encodings::MONO8) {
-        caps = gst_caps_new_simple("video/x-raw-gray", NULL);
+        caps = gst_caps_new_simple("video/x-raw",
+                "format", G_TYPE_STRING, "GRAY8",
+                NULL);
     } else if (image_encoding_ == "jpeg") {
         caps = gst_caps_new_simple("image/jpeg", NULL);
     }
@@ -250,7 +254,8 @@ namespace gscam {
       // This should block until a new frame is awake, this way, we'll run at the
       // actual capture framerate of the device.
       // ROS_DEBUG("Getting data...");
-      GstBuffer* buf = gst_app_sink_pull_buffer(GST_APP_SINK(sink_));
+      GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(sink_));
+      GstBuffer* buf = gst_sample_get_buffer(sample);
       GstClockTime bt = gst_element_get_base_time(pipeline_);
       // ROS_INFO("New buffer: timestamp %.6f %lu %lu %.3f",
       //         GST_TIME_AS_USECONDS(buf->timestamp+bt)/1e6+time_offset_, buf->timestamp, bt, time_offset_);
@@ -276,7 +281,7 @@ namespace gscam {
 
       // Get the image width and height
       GstPad* pad = gst_element_get_static_pad(sink_, "sink");
-      const GstCaps *caps = gst_pad_get_negotiated_caps(pad);
+      const GstCaps *caps = gst_pad_get_current_caps(pad);
       GstStructure *structure = gst_caps_get_structure(caps,0);
       gst_structure_get_int(structure,"width",&width_);
       gst_structure_get_int(structure,"height",&height_);
@@ -285,7 +290,7 @@ namespace gscam {
       sensor_msgs::CameraInfoPtr cinfo;
       cinfo.reset(new sensor_msgs::CameraInfo(camera_info_manager_.getCameraInfo()));
       if (use_gst_timestamps_) {
-          cinfo->header.stamp = ros::Time(GST_TIME_AS_USECONDS(buf->timestamp+bt)/1e6+time_offset_);
+          cinfo->header.stamp = ros::Time(GST_TIME_AS_USECONDS(GST_BUFFER_PTS(buf)+bt)/1e6+time_offset_);
       } else {
           cinfo->header.stamp = ros::Time::now();
       }
@@ -295,9 +300,12 @@ namespace gscam {
           sensor_msgs::CompressedImagePtr img(new sensor_msgs::CompressedImage());
           img->header = cinfo->header;
           img->format = "jpeg";
-          img->data.resize(buf->size);
-          std::copy(buf->data, (buf->data)+(buf->size),
+          GstMapInfo info;
+          gst_buffer_map(buf, &info, GST_MAP_READ);
+          img->data.resize(info.size);
+          std::copy(info.data, (info.data)+(info.size),
                   img->data.begin());
+          gst_buffer_unmap(buf, &info);
           jpeg_pub_.publish(img);
           cinfo_pub_.publish(cinfo);
       } else {
@@ -307,10 +315,10 @@ namespace gscam {
               ? width_ * height_ * 3
               : width_ * height_;
 
-          if (buf->size < expected_frame_size) {
+          if (gst_buffer_get_size(buf) < expected_frame_size) {
               ROS_WARN_STREAM( "GStreamer image buffer underflow: Expected frame to be "
                       << expected_frame_size << " bytes but got only "
-                      << (buf->size) << " bytes. (make sure frames are correctly encoded)");
+                      << (gst_buffer_get_size(buf)) << " bytes. (make sure frames are correctly encoded)");
           }
 
           // Construct Image message
@@ -333,10 +341,13 @@ namespace gscam {
           } else {
               img->step = width_;
           }
+          GstMapInfo info;
+          gst_buffer_map(buf, &info, GST_MAP_READ);
           std::copy(
-                  buf->data,
-                  (buf->data)+(buf->size),
+                  info.data,
+                  (info.data)+(info.size),
                   img->data.begin());
+          gst_buffer_unmap(buf, &info);
 
           // Publish the image/info
           camera_pub_.publish(img, cinfo);

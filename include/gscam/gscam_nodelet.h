@@ -5,6 +5,7 @@
 
 #include <gscam/gscam.h>
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
 
 namespace gscam {

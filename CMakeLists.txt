@@ -4,8 +4,10 @@ project(gscam)
 
 # System Dependencies
 find_package(PkgConfig)
-pkg_check_modules(GSTREAMER REQUIRED gstreamer-0.10)
-pkg_check_modules(GST_APP REQUIRED gstreamer-app-0.10)
+#pkg_check_modules(GSTREAMER REQUIRED gstreamer-0.10)
+#pkg_check_modules(GST_APP REQUIRED gstreamer-app-0.10)
+pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
+pkg_check_modules(GST_APP REQUIRED gstreamer-app-1.0)
 
 if(USE_ROSBUILD)
   # Use rosbuild
@@ -52,7 +54,7 @@ else()
   include_directories(
     include
     ${catkin_INCLUDE_DIRS}
-    ${GLIB_INCLUDE_DIRS}
+    ${GSTREAMER_INCLUDE_DIRS}
     ${GST_APP_INCLUDE_DIRS})
 
   add_library(gscam src/gscam.cpp)
