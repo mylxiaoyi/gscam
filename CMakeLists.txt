@@ -99,6 +99,10 @@ else()
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
     )
 
+  install(FILES examples/uncalibrated_parameters.ini
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/examples
+    )
+
   # Interim compatibility
   # Remove this in the next release
   install(FILES ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/gscam_node
